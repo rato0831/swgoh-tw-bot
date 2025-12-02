@@ -25,11 +25,27 @@ async def interactions(request: Request):
 
     data = await request.json()
 
+    # Discord PING
     if data.get('type') == 1:
         return JSONResponse(content={"type": 1})
 
+    # コマンド実行
     if data.get('type') == 2:
-        if data['data']['name'] == 'ping':
+        command_name = data['data']['name']
+        
+        # /ping コマンド
+        if command_name == 'ping':
             return JSONResponse(content={"type": 4, "data": {"content": "Pong!"}})
+        
+        # /twcompare コマンド
+        if command_name == 'twcompare':
+            options = data['data']['options']
+            own_guild = next(opt['value'] for opt in options if opt['name'] == 'own_guild')
+            opponent_guild = next(opt['value'] for opt in options if opt['name'] == 'opponent_guild')
+            
+            # とりあえず受け取った値を表示
+            message = f"受け取りました！\n自ギルド: {own_guild}\n相手ギルド: {opponent_guild}\n\n（データ取得処理は次のステップで実装します）"
+            
+            return JSONResponse(content={"type": 4, "data": {"content": message}})
 
     return JSONResponse(content={"message": "Unhandled interaction type"})
