@@ -1,4 +1,5 @@
 import os
+import requests
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from nacl.signing import VerifyKey
@@ -43,9 +44,26 @@ async def interactions(request: Request):
             own_guild = next(opt['value'] for opt in options if opt['name'] == 'own_guild')
             opponent_guild = next(opt['value'] for opt in options if opt['name'] == 'opponent_guild')
             
-            # とりあえず受け取った値を表示
-            message = f"受け取りました！\n自ギルド: {own_guild}\n相手ギルド: {opponent_guild}\n\n（データ取得処理は次のステップで実装します）"
+            try:
+                # swgoh.gg APIテスト
+                url = f"https://swgoh.gg/api/guild/{own_guild}/"
+                response = requests.get(url, timeout=10)
+                
+                if response.status_code == 200:
+                    guild_data = response.json()
+                    message = f"✅ 自ギルド: {guild_data.get('data', {}).get('name', 'unknown')}\nGP: {guild_data.get('data', {}).get('galactic_power', 'unknown')}"
+                else:
+                    message = f"❌ 失敗\nStatus: {response.status_code}"
+                    
+            except Exception as e:
+                message = f"❌ エラー発生: {str(e)}"
             
-            return JSONResponse(content={"type": 4, "data": {"content": message}})
+            return JSONResponse(content={
+                "type": 4, 
+                "data": {
+                    "content": message,
+                    "flags": 64
+                }
+            })
 
     return JSONResponse(content={"message": "Unhandled interaction type"})
