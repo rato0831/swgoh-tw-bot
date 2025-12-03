@@ -1,7 +1,7 @@
 import os
 import json
 import requests
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, BackgroundTasks
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -205,8 +205,20 @@ def format_comparison(own, opp):
     
     return result
 
+def send_followup(webhook_url: str, content: str):
+    """Webhook経由で結果送信"""
+    try:
+        response = requests.post(
+            webhook_url,
+            json={"content": content},
+            timeout=10
+        )
+        response.raise_for_status()
+    except Exception as e:
+        print(f"Failed to send followup: {e}")
+
 @app.post("/api")
-async def interactions(request: Request):
+async def interactions(request: Request, background_tasks: BackgroundTasks):
     body = await request.body()
     if not verify_discord_signature(request, body):
         return Response(status_code=401, content="Invalid signature")
@@ -238,30 +250,33 @@ async def interactions(request: Request):
                     "data": {"content": "エラー: ギルドIDが指定されていません", "flags": 64}
                 }
             
-            try:
-                own_data = analyze_guild(own_guild)
-                opp_data = analyze_guild(opp_guild)
-                
-                if not own_data or not opp_data:
-                    return {
-                        "type": 4,
-                        "data": {"content": "エラー: ギルドデータの取得に失敗しました", "flags": 64}
-                    }
-                
-                comparison = format_comparison(own_data, opp_data)
-                
-                return {
-                    "type": 4,
-                    "data": {
-                        "content": f"```\n{comparison}\n```",
-                        "flags": 64
-                    }
-                }
-            except Exception as e:
-                return {
-                    "type": 4,
-                    "data": {"content": f"エラーが発生しました: {str(e)}", "flags": 64}
-                }
+            # Webhook URL生成
+            app_id = data.get("application_id")
+            token = data.get("token")
+            webhook_url = f"https://discord.com/api/v10/webhooks/{app_id}/{token}"
+            
+            # バックグラウンドタスク登録
+            def process_and_send():
+                try:
+                    own_data = analyze_guild(own_guild)
+                    opp_data = analyze_guild(opp_guild)
+                    
+                    if not own_data or not opp_data:
+                        send_followup(webhook_url, "エラー: ギルドデータの取得に失敗しました")
+                        return
+                    
+                    comparison = format_comparison(own_data, opp_data)
+                    send_followup(webhook_url, f"```\n{comparison}\n```")
+                except Exception as e:
+                    send_followup(webhook_url, f"エラーが発生しました: {str(e)}")
+            
+            background_tasks.add_task(process_and_send)
+            
+            # すぐに「処理中」を返す
+            return {
+                "type": 5,  # DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE
+                "data": {"flags": 64}  # Ephemeral
+            }
     
     return {"type": 4, "data": {"content": "Unknown command"}}
 
