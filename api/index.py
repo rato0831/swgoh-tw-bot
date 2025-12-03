@@ -75,9 +75,9 @@ def analyze_guild(guild_id):
     levi_count = 0
     prof_count = 0
     exec_count = 0
+    fdc_lv15 = 0
+    fdc_lv12 = 0
     dc_lv9 = 0
-    dc_lv12 = 0
-    dc_lv15 = 0
     arena_ranks = []
     ship_ranks = []
     
@@ -96,9 +96,9 @@ def analyze_guild(guild_id):
             "levi": 0,
             "prof": 0,
             "exec": 0,
+            "fdc_lv15": 0,
+            "fdc_lv12": 0,
             "dc_lv9": 0,
-            "dc_lv12": 0,
-            "dc_lv15": 0,
             "arena": None,
             "ship": None
         }
@@ -117,16 +117,19 @@ def analyze_guild(guild_id):
             elif base_id == "CAPITALEXECUTOR":
                 result["exec"] = 1
         
-        # データクロン（レベル別）
+        # データクロン（FDCとDCを区別）
         datacrons = player_data.get("datacrons", [])
         for dc in datacrons:
             tier = dc.get("tier", 0)
-            if tier == 9:
+            template = dc.get("template_base_id", "")
+            is_focused = "focused" in template.lower()
+            
+            if is_focused and tier == 15:
+                result["fdc_lv15"] += 1
+            elif is_focused and tier == 12:
+                result["fdc_lv12"] += 1
+            elif not is_focused and tier == 9:
                 result["dc_lv9"] += 1
-            elif tier == 12:
-                result["dc_lv12"] += 1
-            elif tier == 15:
-                result["dc_lv15"] += 1
         
         # ランク
         data_section = player_data.get("data", {})
@@ -146,9 +149,9 @@ def analyze_guild(guild_id):
                 levi_count += result["levi"]
                 prof_count += result["prof"]
                 exec_count += result["exec"]
+                fdc_lv15 += result["fdc_lv15"]
+                fdc_lv12 += result["fdc_lv12"]
                 dc_lv9 += result["dc_lv9"]
-                dc_lv12 += result["dc_lv12"]
-                dc_lv15 += result["dc_lv15"]
                 
                 if result["arena"]:
                     arena_ranks.append(result["arena"])
@@ -172,9 +175,9 @@ def analyze_guild(guild_id):
         "levi_count": levi_count,
         "prof_count": prof_count,
         "exec_count": exec_count,
+        "fdc_lv15": fdc_lv15,
+        "fdc_lv12": fdc_lv12,
         "dc_lv9": dc_lv9,
-        "dc_lv12": dc_lv12,
-        "dc_lv15": dc_lv15,
         "avg_arena": avg_arena,
         "avg_ship": avg_ship
     }
@@ -206,9 +209,9 @@ def format_comparison(own, opp):
     result += f"  平均シップランク: {own['avg_ship']}位 vs {opp['avg_ship']}位\n\n"
     
     result += "データクロン\n"
-    result += f"  Lv9: {own['dc_lv9']}個 vs {opp['dc_lv9']}個\n"
-    result += f"  Lv12: {own['dc_lv12']}個 vs {opp['dc_lv12']}個\n"
-    result += f"  Lv15: {own['dc_lv15']}個 vs {opp['dc_lv15']}個\n\n"
+    result += f"  FDC Lv15: {own['fdc_lv15']}個 vs {opp['fdc_lv15']}個\n"
+    result += f"  FDC Lv12: {own['fdc_lv12']}個 vs {opp['fdc_lv12']}個\n"
+    result += f"  DC Lv9: {own['dc_lv9']}個 vs {opp['dc_lv9']}個\n\n"
     
     result += "個人ランク\n"
     result += f"  カイバー: {own['leagues']['Kyber']}人 vs {opp['leagues']['Kyber']}人\n"
