@@ -80,18 +80,21 @@ def analyze_guild(guild_id):
     dc_lv9 = 0
     arena_ranks = []
     ship_ranks = []
+    success_count = 0
+    failed_count = 0
     
     def process_member(member):
         """1メンバーの詳細データ取得"""
         ally_code = member.get("ally_code")
         if not ally_code:
-            return None
+            return {"success": False}
         
         player_data = get_player_data(ally_code)
         if not player_data:
-            return None
+            return {"success": False}
         
         result = {
+            "success": True,
             "gl": 0,
             "levi": 0,
             "prof": 0,
@@ -144,7 +147,8 @@ def analyze_guild(guild_id):
         
         for future in as_completed(futures):
             result = future.result()
-            if result:
+            if result.get("success"):
+                success_count += 1
                 gl_total += result["gl"]
                 levi_count += result["levi"]
                 prof_count += result["prof"]
@@ -157,6 +161,8 @@ def analyze_guild(guild_id):
                     arena_ranks.append(result["arena"])
                 if result["ship"]:
                     ship_ranks.append(result["ship"])
+            else:
+                failed_count += 1
     
     avg_arena = sum(arena_ranks) // len(arena_ranks) if arena_ranks else 0
     avg_ship = sum(ship_ranks) // len(ship_ranks) if ship_ranks else 0
@@ -179,7 +185,9 @@ def analyze_guild(guild_id):
         "fdc_lv12": fdc_lv12,
         "dc_lv9": dc_lv9,
         "avg_arena": avg_arena,
-        "avg_ship": avg_ship
+        "avg_ship": avg_ship,
+        "success_count": success_count,
+        "failed_count": failed_count
     }
 
 def format_gp(gp):
@@ -222,6 +230,7 @@ def format_comparison(own, opp):
     result += f"  1000万超: {own['gp_10m_plus']}人 vs {opp['gp_10m_plus']}人\n"
     result += f"  800-1000万: {own['gp_8m_to_10m']}人 vs {opp['gp_8m_to_10m']}人\n"
     result += "━━━━━━━━━━━━━━━━━━━━\n"
+    result += f"\nデータ取得状況: {own['success_count']}/{own['member_count']}人 vs {opp['success_count']}/{opp['member_count']}人\n"
     
     return result
 
