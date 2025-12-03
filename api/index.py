@@ -120,21 +120,25 @@ def analyze_guild(guild_id):
             elif base_id == "CAPITALEXECUTOR":
                 result["exec"] = 1
         
-        # データクロン（現在のtierでカウント）
+        # データクロン（tier >= での集計）
         datacrons = player_data.get("datacrons", [])
         for dc in datacrons:
             tier = dc.get("tier", 0)
             template = dc.get("template_base_id", "")
             is_focused = "focused" in template.lower()
             
-        # データクロン部分
-        if tier >= 9:
-            result["dc_lv9"] += 1
-        if tier >= 12 and is_focused:
-            result["fdc_lv12"] += 1
-        if tier == 15 and is_focused:
-            result["fdc_lv15"] += 1
-
+            # tier >= 9 全て
+            if tier >= 9:
+                result["dc_lv9"] += 1
+            
+            # tier >= 12 かつ focused
+            if tier >= 12 and is_focused:
+                result["fdc_lv12"] += 1
+            
+            # tier == 15 かつ focused
+            if tier == 15 and is_focused:
+                result["fdc_lv15"] += 1
+        
         # ランク
         data_section = player_data.get("data", {})
         result["arena"] = data_section.get("arena_rank")
