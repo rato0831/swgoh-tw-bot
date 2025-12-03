@@ -127,13 +127,14 @@ def analyze_guild(guild_id):
             template = dc.get("template_base_id", "")
             is_focused = "focused" in template.lower()
             
-            if tier == 15 and is_focused:
-                result["fdc_lv15"] += 1
-            elif tier == 12 and is_focused:
-                result["fdc_lv12"] += 1
-            elif tier == 9:  # FDCでもDCでも
-                result["dc_lv9"] += 1
-        
+        # データクロン部分
+        if tier >= 9:
+            result["dc_lv9"] += 1
+        if tier >= 12 and is_focused:
+            result["fdc_lv12"] += 1
+        if tier == 15 and is_focused:
+            result["fdc_lv15"] += 1
+
         # ランク
         data_section = player_data.get("data", {})
         result["arena"] = data_section.get("arena_rank")
