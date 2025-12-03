@@ -130,11 +130,11 @@ def analyze_guild(guild_id):
             
             # 最大レベル到達済みのみカウント
             if current_tier == max_tier:
-                if is_focused and max_tier == 15:
+                if max_tier == 15 and is_focused:
                     result["fdc_lv15"] += 1
-                elif is_focused and max_tier == 12:
+                elif max_tier == 12 and is_focused:
                     result["fdc_lv12"] += 1
-                elif not is_focused and max_tier == 9:
+                elif max_tier == 9:  # FDCでもDCでも9ならDC Lv9にカウント
                     result["dc_lv9"] += 1
         
         # ランク
