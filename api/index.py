@@ -1,4 +1,5 @@
 import os
+import requests
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from nacl.signing import VerifyKey
@@ -7,6 +8,7 @@ from nacl.exceptions import BadSignatureError
 app = FastAPI()
 
 DISCORD_PUBLIC_KEY = os.environ.get('DISCORD_PUBLIC_KEY')
+SWGOH_API_KEY = os.environ.get('SWGOH_API_KEY')
 verify_key = VerifyKey(bytes.fromhex(DISCORD_PUBLIC_KEY))
 
 def format_number(num):
@@ -17,48 +19,64 @@ def format_number(num):
         return f"{num / 1000:.0f}K"
     return str(num)
 
-def get_mock_guild_data(guild_id):
-    """モックデータを返す（API承認後、ここを実データ取得に差し替え）"""
-    if "test1" in guild_id.lower() or "zvca" in guild_id.lower():
-        return {
-            "name": "職人魂",
-            "gp": 467000000,
-            "member_count": 46,
-            "gl_count": 243,
-            "leviathan": 14,
-            "profundity": 15,
-            "executor": 26,
-            "avg_skill": 2323,
-            "avg_arena": 272,
-            "avg_ship": 68,
-            "datacron_15": 13,
-            "datacron_12": 18,
-            "datacron_9": 81,
-            "kyber": 6,
-            "aurodium": 8,
-            "gp_10m_plus": 27,
-            "gp_8m_10m": 11
+def get_guild_data(guild_id):
+    """swgoh.gg APIから実データ取得"""
+    url = f"http://swgoh.gg/api/guild-profile/{guild_id}"
+    headers = {
+        "content-type": "application/json",
+        "x-gg-bot-access": SWGOH_API_KEY
+    }
+    
+    try:
+        response = requests.get(url, headers=headers, timeout=15)
+        if response.status_code != 200:
+            return None
+        
+        data = response.json()
+        guild_info = data.get('data', {})
+        
+        # 基本情報
+        result = {
+            "name": guild_info.get('name', 'Unknown'),
+            "gp": guild_info.get('galactic_power', 0),
+            "member_count": guild_info.get('member_count', 0),
         }
-    else:
-        return {
-            "name": "相手ギルド",
-            "gp": 438000000,
-            "member_count": 49,
-            "gl_count": 247,
-            "leviathan": 13,
-            "profundity": 22,
-            "executor": 40,
-            "avg_skill": 2362,
-            "avg_arena": 227,
-            "avg_ship": 68,
-            "datacron_15": 9,
-            "datacron_12": 11,
-            "datacron_9": 105,
-            "kyber": 7,
-            "aurodium": 9,
-            "gp_10m_plus": 16,
-            "gp_8m_10m": 18
-        }
+        
+        # メンバー情報を集計
+        members = guild_info.get('members', [])
+        
+        # リーグ別カウント
+        league_counts = {}
+        for member in members:
+            league = member.get('league_id', 'UNKNOWN')
+            league_counts[league] = league_counts.get(league, 0) + 1
+        
+        result['kyber'] = league_counts.get('KYBER', 0)
+        result['aurodium'] = league_counts.get('AURODIUM', 0)
+        result['chromium'] = league_counts.get('CHROMIUM', 0)
+        
+        # GP分布
+        gp_10m_plus = 0
+        gp_8m_10m = 0
+        total_gp = 0
+        
+        for member in members:
+            gp = member.get('galactic_power', 0)
+            total_gp += gp
+            if gp >= 10000000:
+                gp_10m_plus += 1
+            elif gp >= 8000000:
+                gp_8m_10m += 1
+        
+        result['gp_10m_plus'] = gp_10m_plus
+        result['gp_8m_10m'] = gp_8m_10m
+        result['avg_gp'] = total_gp // len(members) if members else 0
+        
+        return result
+        
+    except Exception as e:
+        print(f"Error fetching guild data: {str(e)}")
+        return None
 
 def compare_guilds(own_data, opponent_data):
     """2つのギルドを比較してフォーマットされた文字列を返す"""
@@ -67,32 +85,17 @@ def compare_guilds(own_data, opponent_data):
     output += "総合戦力\n"
     output += f"  GP: {format_number(own_data['gp'])} vs {format_number(opponent_data['gp'])}\n"
     output += f"  メンバー数: {own_data['member_count']}人 vs {opponent_data['member_count']}人\n"
-    output += f"  GL総数: {own_data['gl_count']} vs {opponent_data['gl_count']}\n\n"
-    
-    output += "艦船戦力\n"
-    output += f"  Leviathan: {own_data['leviathan']} vs {opponent_data['leviathan']}\n"
-    output += f"  Profundity: {own_data['profundity']} vs {opponent_data['profundity']}\n"
-    output += f"  Executor: {own_data['executor']} vs {opponent_data['executor']}\n\n"
-    
-    output += "平均値\n"
-    output += f"  スキルレート: {own_data['avg_skill']:,} vs {opponent_data['avg_skill']:,}\n"
-    output += f"  アリーナランク: {own_data['avg_arena']}位 vs {opponent_data['avg_arena']}位\n"
-    output += f"  シップランク: {own_data['avg_ship']}位 vs {opponent_data['avg_ship']}位\n\n"
-    
-    output += "データクロン\n"
-    output += f"  Lv15: {own_data['datacron_15']}人 vs {opponent_data['datacron_15']}人\n"
-    output += f"  Lv12: {own_data['datacron_12']}人 vs {opponent_data['datacron_12']}人\n"
-    output += f"  Lv9: {own_data['datacron_9']}個 vs {opponent_data['datacron_9']}個\n\n"
+    output += f"  平均GP: {format_number(own_data['avg_gp'])} vs {format_number(opponent_data['avg_gp'])}\n\n"
     
     output += "個人ランク\n"
     output += f"  カイバー: {own_data['kyber']}人 vs {opponent_data['kyber']}人\n"
-    output += f"  オーロジウム: {own_data['aurodium']}人 vs {opponent_data['aurodium']}人\n\n"
+    output += f"  オーロジウム: {own_data['aurodium']}人 vs {opponent_data['aurodium']}人\n"
+    output += f"  クロミウム: {own_data['chromium']}人 vs {opponent_data['chromium']}人\n\n"
     
     output += "GP分布\n"
     output += f"  1000万超: {own_data['gp_10m_plus']}人 vs {opponent_data['gp_10m_plus']}人\n"
     output += f"  800-1000万: {own_data['gp_8m_10m']}人 vs {opponent_data['gp_8m_10m']}人\n"
     output += "━━━━━━━━━━━━━━━━━━━━\n"
-    output += "\n※ モックデータで動作確認中（API承認後、実データに切り替わります）"
     
     return output
 
@@ -130,16 +133,14 @@ async def interactions(request: Request):
             own_guild = next(opt['value'] for opt in options if opt['name'] == 'own_guild')
             opponent_guild = next(opt['value'] for opt in options if opt['name'] == 'opponent_guild')
             
-            try:
-                # モックデータ取得（API承認後、ここを実装に差し替え）
-                own_data = get_mock_guild_data(own_guild)
-                opponent_data = get_mock_guild_data(opponent_guild)
-                
-                # 比較結果をフォーマット
+            # データ取得
+            own_data = get_guild_data(own_guild)
+            opponent_data = get_guild_data(opponent_guild)
+            
+            if not own_data or not opponent_data:
+                message = "❌ ギルドデータの取得に失敗しました。ギルドIDを確認してください。"
+            else:
                 message = compare_guilds(own_data, opponent_data)
-                
-            except Exception as e:
-                message = f"❌ エラー発生: {str(e)}"
             
             return JSONResponse(content={
                 "type": 4, 
