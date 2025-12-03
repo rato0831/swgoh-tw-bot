@@ -1,153 +1,270 @@
 import os
+import json
 import requests
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Request, Response
 from nacl.signing import VerifyKey
 from nacl.exceptions import BadSignatureError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 app = FastAPI()
 
-DISCORD_PUBLIC_KEY = os.environ.get('DISCORD_PUBLIC_KEY')
-SWGOH_API_KEY = os.environ.get('SWGOH_API_KEY')
-verify_key = VerifyKey(bytes.fromhex(DISCORD_PUBLIC_KEY))
+DISCORD_PUBLIC_KEY = os.environ.get("DISCORD_PUBLIC_KEY")
+SWGOH_API_KEY = os.environ.get("SWGOH_API_KEY")
 
-def format_number(num):
-    """数値を見やすくフォーマット（例: 4670000 → 467M）"""
-    if num >= 1000000:
-        return f"{num / 1000000:.0f}M"
-    elif num >= 1000:
-        return f"{num / 1000:.0f}K"
-    return str(num)
+def verify_discord_signature(request: Request, body: bytes):
+    signature = request.headers.get("X-Signature-Ed25519")
+    timestamp = request.headers.get("X-Signature-Timestamp")
+    if not signature or not timestamp:
+        return False
+    try:
+        verify_key = VerifyKey(bytes.fromhex(DISCORD_PUBLIC_KEY))
+        verify_key.verify(timestamp.encode() + body, bytes.fromhex(signature))
+        return True
+    except (BadSignatureError, ValueError):
+        return False
 
 def get_guild_data(guild_id):
-    """swgoh.gg APIから実データ取得"""
+    """ギルドの基本情報を取得"""
     url = f"http://swgoh.gg/api/guild-profile/{guild_id}"
     headers = {
         "content-type": "application/json",
         "x-gg-bot-access": SWGOH_API_KEY
     }
+    response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code != 200:
+        return None
+    return response.json()
+
+def get_player_data(ally_code):
+    """プレイヤーの詳細情報を取得"""
+    url = f"http://swgoh.gg/api/player/{ally_code}/"
+    headers = {
+        "content-type": "application/json",
+        "x-gg-bot-access": SWGOH_API_KEY
+    }
+    response = requests.get(url, headers=headers, timeout=15)
+    if response.status_code != 200:
+        return None
+    return response.json()
+
+def analyze_guild(guild_id):
+    """ギルド全体の統計を分析（並列処理版）"""
+    guild_data = get_guild_data(guild_id)
+    if not guild_data:
+        return None
     
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-        if response.status_code != 200:
+    guild_name = guild_data.get("data", {}).get("name", "???")
+    members = guild_data.get("data", {}).get("members", [])
+    
+    # Phase 1データ（すぐ計算可能）
+    total_gp = sum(m.get("galactic_power", 0) for m in members)
+    member_count = len(members)
+    avg_gp = total_gp // member_count if member_count > 0 else 0
+    
+    leagues = {"Kyber": 0, "Aurodium": 0, "Chromium": 0, "Bronzium": 0, "Carbonite": 0}
+    for m in members:
+        league = m.get("league_name", "")
+        if league in leagues:
+            leagues[league] += 1
+    
+    gp_10m_plus = sum(1 for m in members if m.get("galactic_power", 0) >= 10_000_000)
+    gp_8m_to_10m = sum(1 for m in members if 8_000_000 <= m.get("galactic_power", 0) < 10_000_000)
+    
+    # Phase 2: 並列でメンバー詳細取得
+    gl_total = 0
+    levi_count = 0
+    prof_count = 0
+    exec_count = 0
+    dc9_plus = 0
+    arena_ranks = []
+    ship_ranks = []
+    
+    def process_member(member):
+        """1メンバーの詳細データ取得"""
+        ally_code = member.get("ally_code")
+        if not ally_code:
             return None
         
-        data = response.json()
-        guild_info = data.get('data', {})
+        player_data = get_player_data(ally_code)
+        if not player_data:
+            return None
         
-        # 基本情報
         result = {
-            "name": guild_info.get('name', 'Unknown'),
-            "gp": guild_info.get('galactic_power', 0),
-            "member_count": guild_info.get('member_count', 0),
+            "gl": 0,
+            "levi": 0,
+            "prof": 0,
+            "exec": 0,
+            "dc9": 0,
+            "arena": None,
+            "ship": None
         }
         
-        # メンバー情報を集計
-        members = guild_info.get('members', [])
+        # GL数
+        units = player_data.get("units", [])
+        for unit in units:
+            if unit.get("data", {}).get("is_galactic_legend", False):
+                result["gl"] += 1
+            
+            base_id = unit.get("data", {}).get("base_id", "")
+            if base_id == "CAPITALLEVIATHAN":
+                result["levi"] = 1
+            elif base_id == "CAPITALPROFUNDITY":
+                result["prof"] = 1
+            elif base_id == "CAPITALEXECUTOR":
+                result["exec"] = 1
         
-        # リーグ別カウント
-        league_counts = {}
-        for member in members:
-            league = member.get('league_id', 'UNKNOWN')
-            league_counts[league] = league_counts.get(league, 0) + 1
+        # データクロン
+        datacrons = player_data.get("datacrons", [])
+        result["dc9"] = sum(1 for dc in datacrons if dc.get("tier", 0) >= 9)
         
-        result['kyber'] = league_counts.get('KYBER', 0)
-        result['aurodium'] = league_counts.get('AURODIUM', 0)
-        result['chromium'] = league_counts.get('CHROMIUM', 0)
-        
-        # GP分布
-        gp_10m_plus = 0
-        gp_8m_10m = 0
-        total_gp = 0
-        
-        for member in members:
-            gp = member.get('galactic_power', 0)
-            total_gp += gp
-            if gp >= 10000000:
-                gp_10m_plus += 1
-            elif gp >= 8000000:
-                gp_8m_10m += 1
-        
-        result['gp_10m_plus'] = gp_10m_plus
-        result['gp_8m_10m'] = gp_8m_10m
-        result['avg_gp'] = total_gp // len(members) if members else 0
+        # ランク
+        data_section = player_data.get("data", {})
+        result["arena"] = data_section.get("arena_rank")
+        result["ship"] = data_section.get("fleet_arena", {}).get("rank")
         
         return result
+    
+    # 並列処理実行（最大20スレッド）
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        futures = {executor.submit(process_member, m): m for m in members}
         
-    except Exception as e:
-        print(f"Error fetching guild data: {str(e)}")
-        return None
+        for future in as_completed(futures):
+            result = future.result()
+            if result:
+                gl_total += result["gl"]
+                levi_count += result["levi"]
+                prof_count += result["prof"]
+                exec_count += result["exec"]
+                dc9_plus += result["dc9"]
+                
+                if result["arena"]:
+                    arena_ranks.append(result["arena"])
+                if result["ship"]:
+                    ship_ranks.append(result["ship"])
+    
+    avg_arena = sum(arena_ranks) // len(arena_ranks) if arena_ranks else 0
+    avg_ship = sum(ship_ranks) // len(ship_ranks) if ship_ranks else 0
+    avg_gl = gl_total / member_count if member_count > 0 else 0
+    
+    return {
+        "name": guild_name,
+        "total_gp": total_gp,
+        "member_count": member_count,
+        "avg_gp": avg_gp,
+        "leagues": leagues,
+        "gp_10m_plus": gp_10m_plus,
+        "gp_8m_to_10m": gp_8m_to_10m,
+        "gl_total": gl_total,
+        "avg_gl": avg_gl,
+        "levi_count": levi_count,
+        "prof_count": prof_count,
+        "exec_count": exec_count,
+        "dc9_plus": dc9_plus,
+        "avg_arena": avg_arena,
+        "avg_ship": avg_ship
+    }
 
-def compare_guilds(own_data, opponent_data):
-    """2つのギルドを比較してフォーマットされた文字列を返す"""
-    output = f"【TW戦力比較】{own_data['name']} vs {opponent_data['name']}\n\n"
-    output += "━━━━━━━━━━━━━━━━━━━━\n"
-    output += "総合戦力\n"
-    output += f"  GP: {format_number(own_data['gp'])} vs {format_number(opponent_data['gp'])}\n"
-    output += f"  メンバー数: {own_data['member_count']}人 vs {opponent_data['member_count']}人\n"
-    output += f"  平均GP: {format_number(own_data['avg_gp'])} vs {format_number(opponent_data['avg_gp'])}\n\n"
+def format_gp(gp):
+    """GPをM単位でフォーマット"""
+    return f"{gp // 1_000_000}M"
+
+def format_comparison(own, opp):
+    """比較結果をフォーマット（Phase 2対応）"""
+    result = f"【TW戦力比較】{own['name']} vs {opp['name']}\n\n"
+    result += "━━━━━━━━━━━━━━━━━━━━\n"
+    result += "総合戦力\n"
+    result += f"  GP: {format_gp(own['total_gp'])} vs {format_gp(opp['total_gp'])}\n"
+    result += f"  メンバー数: {own['member_count']}人 vs {opp['member_count']}人\n"
+    result += f"  平均GP: {format_gp(own['avg_gp'])} vs {format_gp(opp['avg_gp'])}\n\n"
     
-    output += "個人ランク\n"
-    output += f"  カイバー: {own_data['kyber']}人 vs {opponent_data['kyber']}人\n"
-    output += f"  オーロジウム: {own_data['aurodium']}人 vs {opponent_data['aurodium']}人\n"
-    output += f"  クロミウム: {own_data['chromium']}人 vs {opponent_data['chromium']}人\n\n"
+    result += "GL（Galactic Legend）\n"
+    result += f"  合計: {own['gl_total']}体 vs {opp['gl_total']}体\n"
+    result += f"  平均: {own['avg_gl']:.1f}体 vs {opp['avg_gl']:.1f}体\n\n"
     
-    output += "GP分布\n"
-    output += f"  1000万超: {own_data['gp_10m_plus']}人 vs {opponent_data['gp_10m_plus']}人\n"
-    output += f"  800-1000万: {own_data['gp_8m_10m']}人 vs {opponent_data['gp_8m_10m']}人\n"
-    output += "━━━━━━━━━━━━━━━━━━━━\n"
+    result += "主要艦船\n"
+    result += f"  Leviathan: {own['levi_count']}隻 vs {opp['levi_count']}隻\n"
+    result += f"  Profundity: {own['prof_count']}隻 vs {opp['prof_count']}隻\n"
+    result += f"  Executor: {own['exec_count']}隻 vs {opp['exec_count']}隻\n\n"
     
-    return output
+    result += "平均値\n"
+    result += f"  平均アリーナランク: {own['avg_arena']}位 vs {opp['avg_arena']}位\n"
+    result += f"  平均シップランク: {own['avg_ship']}位 vs {opp['avg_ship']}位\n\n"
+    
+    result += "データクロン\n"
+    result += f"  Lv9以上: {own['dc9_plus']}個 vs {opp['dc9_plus']}個\n\n"
+    
+    result += "個人ランク\n"
+    result += f"  カイバー: {own['leagues']['Kyber']}人 vs {opp['leagues']['Kyber']}人\n"
+    result += f"  オーロジウム: {own['leagues']['Aurodium']}人 vs {opp['leagues']['Aurodium']}人\n"
+    result += f"  クロミウム: {own['leagues']['Chromium']}人 vs {opp['leagues']['Chromium']}人\n\n"
+    
+    result += "GP分布\n"
+    result += f"  1000万超: {own['gp_10m_plus']}人 vs {opp['gp_10m_plus']}人\n"
+    result += f"  800-1000万: {own['gp_8m_to_10m']}人 vs {opp['gp_8m_to_10m']}人\n"
+    result += "━━━━━━━━━━━━━━━━━━━━\n"
+    
+    return result
 
 @app.post("/api")
 async def interactions(request: Request):
-    signature = request.headers.get('X-Signature-Ed25519')
-    timestamp = request.headers.get('X-Signature-Timestamp')
     body = await request.body()
-
-    if signature is None or timestamp is None:
-        raise HTTPException(status_code=401, detail="Missing signature headers")
-
-    try:
-        verify_key.verify(f'{timestamp}{body.decode("utf-8")}'.encode(), bytes.fromhex(signature))
-    except BadSignatureError:
-        raise HTTPException(status_code=401, detail="Invalid signature")
-
-    data = await request.json()
-
-    # Discord PING
-    if data.get('type') == 1:
-        return JSONResponse(content={"type": 1})
-
-    # コマンド実行
-    if data.get('type') == 2:
-        command_name = data['data']['name']
+    if not verify_discord_signature(request, body):
+        return Response(status_code=401, content="Invalid signature")
+    
+    data = json.loads(body)
+    
+    # PING
+    if data.get("type") == 1:
+        return {"type": 1}
+    
+    # Slash Command
+    if data.get("type") == 2:
+        command_name = data.get("data", {}).get("name")
         
-        # /ping コマンド
-        if command_name == 'ping':
-            return JSONResponse(content={"type": 4, "data": {"content": "Pong!"}})
+        if command_name == "ping":
+            return {
+                "type": 4,
+                "data": {"content": "Pong!"}
+            }
         
-        # /twcompare コマンド
-        if command_name == 'twcompare':
-            options = data['data']['options']
-            own_guild = next(opt['value'] for opt in options if opt['name'] == 'own_guild')
-            opponent_guild = next(opt['value'] for opt in options if opt['name'] == 'opponent_guild')
+        elif command_name == "twcompare":
+            options = {opt["name"]: opt["value"] for opt in data.get("data", {}).get("options", [])}
+            own_guild = options.get("own_guild")
+            opp_guild = options.get("opponent_guild")
             
-            # データ取得
-            own_data = get_guild_data(own_guild)
-            opponent_data = get_guild_data(opponent_guild)
-            
-            if not own_data or not opponent_data:
-                message = "❌ ギルドデータの取得に失敗しました。ギルドIDを確認してください。"
-            else:
-                message = compare_guilds(own_data, opponent_data)
-            
-            return JSONResponse(content={
-                "type": 4, 
-                "data": {
-                    "content": message,
-                    "flags": 64
+            if not own_guild or not opp_guild:
+                return {
+                    "type": 4,
+                    "data": {"content": "エラー: ギルドIDが指定されていません", "flags": 64}
                 }
-            })
+            
+            try:
+                own_data = analyze_guild(own_guild)
+                opp_data = analyze_guild(opp_guild)
+                
+                if not own_data or not opp_data:
+                    return {
+                        "type": 4,
+                        "data": {"content": "エラー: ギルドデータの取得に失敗しました", "flags": 64}
+                    }
+                
+                comparison = format_comparison(own_data, opp_data)
+                
+                return {
+                    "type": 4,
+                    "data": {
+                        "content": f"```\n{comparison}\n```",
+                        "flags": 64
+                    }
+                }
+            except Exception as e:
+                return {
+                    "type": 4,
+                    "data": {"content": f"エラーが発生しました: {str(e)}", "flags": 64}
+                }
+    
+    return {"type": 4, "data": {"content": "Unknown command"}}
 
-    return JSONResponse(content={"message": "Unhandled interaction type"})
+@app.get("/api")
+async def health_check():
+    return {"status": "ok"}
