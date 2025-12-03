@@ -120,19 +120,22 @@ def analyze_guild(guild_id):
             elif base_id == "CAPITALEXECUTOR":
                 result["exec"] = 1
         
-        # データクロン（FDCとDCを区別）
+        # データクロン（最大レベル到達済みのみカウント）
         datacrons = player_data.get("datacrons", [])
         for dc in datacrons:
-            tier = dc.get("tier", 0)
+            current_tier = dc.get("tier", 0)
+            max_tier = len(dc.get("tiers", []))
             template = dc.get("template_base_id", "")
             is_focused = "focused" in template.lower()
             
-            if is_focused and tier == 15:
-                result["fdc_lv15"] += 1
-            elif is_focused and tier == 12:
-                result["fdc_lv12"] += 1
-            elif not is_focused and tier == 9:
-                result["dc_lv9"] += 1
+            # 最大レベル到達済みのみカウント
+            if current_tier == max_tier:
+                if is_focused and max_tier == 15:
+                    result["fdc_lv15"] += 1
+                elif is_focused and max_tier == 12:
+                    result["fdc_lv12"] += 1
+                elif not is_focused and max_tier == 9:
+                    result["dc_lv9"] += 1
         
         # ランク
         data_section = player_data.get("data", {})
