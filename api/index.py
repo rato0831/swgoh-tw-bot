@@ -11,8 +11,8 @@ app = FastAPI()
 DISCORD_PUBLIC_KEY = os.environ.get("DISCORD_PUBLIC_KEY")
 SWGOH_API_KEY = os.environ.get("SWGOH_API_KEY")
 
-# GL base_id → 表示名（リリース新しい順）
-GL_NAMES = {
+# 既知のGL表示名（新GL追加時だけここを更新、未登録はbase_idで表示）
+GL_DISPLAY_NAMES = {
     "GLHONDO": "Hondo",
     "GLAHSOKATANO": "Ahsoka",
     "JABBATHEHUTT": "Jabba",
@@ -95,7 +95,7 @@ def process_member_data(member):
         "dc_lv9": 0,
         "arena": None,
         "ship": None,
-        "gl_relics": {}
+        "gl_relics": {}  # {base_id: r_level}
     }
 
     units = player_data.get("units", [])
@@ -167,7 +167,9 @@ def analyze_guild(guild_id):
     arena_ranks = []
     ship_ranks = []
     success_count = 0
-    gl_relic_dist = {base_id: {"r10": 0, "r9": 0} for base_id in GL_NAMES}
+
+    # 動的にGL一覧を収集 {base_id: {"total": 0, "r10": 0, "r9": 0}}
+    gl_relic_dist = {}
 
     with ThreadPoolExecutor(max_workers=20) as executor:
         futures = {executor.submit(process_member_data, m): m for m in members}
@@ -190,13 +192,15 @@ def analyze_guild(guild_id):
                     ship_ranks.append(result["ship"])
 
                 for base_id, r_level in result["gl_relics"].items():
-                    if base_id in gl_relic_dist:
-                        if r_level >= 10:
-                            gl_relic_dist[base_id]["r10"] += 1
-                            gl_r10_total += 1
-                        elif r_level == 9:
-                            gl_relic_dist[base_id]["r9"] += 1
-                            gl_r9_total += 1
+                    if base_id not in gl_relic_dist:
+                        gl_relic_dist[base_id] = {"total": 0, "r10": 0, "r9": 0}
+                    gl_relic_dist[base_id]["total"] += 1  # レリック問わず全所持数
+                    if r_level >= 10:
+                        gl_relic_dist[base_id]["r10"] += 1
+                        gl_r10_total += 1
+                    elif r_level == 9:
+                        gl_relic_dist[base_id]["r9"] += 1
+                        gl_r9_total += 1
 
     avg_arena = sum(arena_ranks) // len(arena_ranks) if arena_ranks else 0
     avg_ship = sum(ship_ranks) // len(ship_ranks) if ship_ranks else 0
@@ -228,11 +232,9 @@ def analyze_guild(guild_id):
 
 # ===== フォーマット =====
 def format_gp(gp):
-    """GPを3桁+M形式でフォーマット（例: 467M, _10M）"""
     return f"{gp // 1_000_000}M".rjust(4)
 
-def row(own_val, opp_val, label, width=3):
-    """数値 vs 数値 : ラベル の形式で1行生成"""
+def row(own_val, opp_val, label, width=4):
     own_str = str(own_val).rjust(width)
     opp_str = str(opp_val).rjust(width)
     return f"  {own_str} vs {opp_str}: {label}\n"
@@ -256,19 +258,21 @@ def format_comparison(own, opp):
     result += row(f"{own['avg_gl']:.1f}", f"{opp['avg_gl']:.1f}", "平均", width=4)
     result += "\n"
 
-    # GLレリック分布（2桁）
+    # GLレリック分布（動的、2桁）
+    all_gl_ids = sorted(
+        set(own['gl_relic_dist'].keys()) | set(opp['gl_relic_dist'].keys())
+    )
     result += "GLレリック分布\n"
-    for base_id, name in GL_NAMES.items():
-        od = own['gl_relic_dist'][base_id]
-        op = opp['gl_relic_dist'][base_id]
-        o_total = od['r10'] + od['r9']
-        p_total = op['r10'] + op['r9']
+    for base_id in all_gl_ids:
+        name = GL_DISPLAY_NAMES.get(base_id, base_id)
+        od = own['gl_relic_dist'].get(base_id, {"total": 0, "r10": 0, "r9": 0})
+        op = opp['gl_relic_dist'].get(base_id, {"total": 0, "r10": 0, "r9": 0})
 
-        if o_total > 0 or p_total > 0:
+        if od["total"] > 0 or op["total"] > 0:
             result += f"  {name}\n"
-            result += row(o_total, p_total, "所持数", width=2)
-            result += row(od['r10'], op['r10'], "R10", width=2)
-            result += row(od['r9'], op['r9'], "R 9\n", width=2)
+            result += row(od["total"], op["total"], "所持数", width=2)
+            result += row(od["r10"], op["r10"], "R10", width=2)
+            result += row(od["r9"], op["r9"], "R 9", width=2)
     result += "\n"
 
     # 主要艦船（2桁）
