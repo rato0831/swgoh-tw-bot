@@ -38,6 +38,16 @@ def verify_discord_signature(request: Request, body: bytes):
     except (BadSignatureError, ValueError):
         return False
 
+# ===== ギルドID抽出 =====
+def extract_guild_id(input_str):
+    """ギルドIDまたはURLからギルドIDを抽出"""
+    input_str = input_str.strip().rstrip("/")
+    if "swgoh.gg" in input_str:
+        parts = input_str.split("/g/")
+        if len(parts) > 1:
+            return parts[1].split("/")[0]
+    return input_str
+
 # ===== SWGOH.gg API =====
 def get_guild_data(guild_id):
     url = f"http://swgoh.gg/api/guild-profile/{guild_id}"
@@ -331,8 +341,8 @@ async def interactions(request: Request, background_tasks: BackgroundTasks):
 
         elif command_name == "twcompare":
             options = {opt["name"]: opt["value"] for opt in data.get("data", {}).get("options", [])}
-            own_guild = options.get("own_guild")
-            opp_guild = options.get("opponent_guild")
+            own_guild = extract_guild_id(options.get("own_guild", ""))
+            opp_guild = extract_guild_id(options.get("opponent_guild", ""))
 
             if not own_guild or not opp_guild:
                 return {"type": 4, "data": {"content": "エラー: ギルドIDが指定されていません"}}
