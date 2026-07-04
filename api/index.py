@@ -40,7 +40,6 @@ def verify_discord_signature(request: Request, body: bytes):
 
 # ===== ギルドID抽出 =====
 def extract_guild_id(input_str):
-    """ギルドIDまたはURLからギルドIDを抽出"""
     input_str = input_str.strip().rstrip("/")
     if "swgoh.gg" in input_str:
         parts = input_str.split("/g/")
@@ -229,9 +228,10 @@ def analyze_guild(guild_id):
 
 # ===== フォーマット =====
 def format_gp(gp):
-    return f"{gp // 1_000_000}M"
+    """GPを3桁+M形式でフォーマット（例: 467M, _10M）"""
+    return f"{gp // 1_000_000}M".rjust(4)
 
-def row(own_val, opp_val, label, width=4):
+def row(own_val, opp_val, label, width=3):
     """数値 vs 数値 : ラベル の形式で1行生成"""
     own_str = str(own_val).rjust(width)
     opp_str = str(opp_val).ljust(width)
@@ -241,22 +241,22 @@ def format_comparison(own, opp):
     result = f"【TW戦力比較】{own['name']} vs {opp['name']}\n\n"
     result += "━━━━━━━━━━━━━━━━━━━━\n"
 
-    # 総合戦力
+    # 総合戦力（GP=4, メンバー=2, 平均GP=4）
     result += "総合戦力\n"
-    result += row(format_gp(own['total_gp']), format_gp(opp['total_gp']), "GP")
-    result += row(own['member_count'], opp['member_count'], "メンバー数")
-    result += row(format_gp(own['avg_gp']), format_gp(opp['avg_gp']), "平均GP")
+    result += row(format_gp(own['total_gp']), format_gp(opp['total_gp']), "GP", width=4)
+    result += row(own['member_count'], opp['member_count'], "メンバー数", width=2)
+    result += row(format_gp(own['avg_gp']), format_gp(opp['avg_gp']), "平均GP", width=4)
     result += "\n"
 
-    # GL
+    # GL（3桁、平均のみ特別）
     result += "GL（Galactic Legend）\n"
-    result += row(own['gl_total'], opp['gl_total'], "合計")
-    result += row(own['gl_r10_total'], opp['gl_r10_total'], "R10")
-    result += row(own['gl_r9_total'], opp['gl_r9_total'], "R 9")
-    result += row(f"{own['avg_gl']:.1f}", f"{opp['avg_gl']:.1f}", "平均")
+    result += row(own['gl_total'], opp['gl_total'], "合計", width=3)
+    result += row(own['gl_r10_total'], opp['gl_r10_total'], "R10", width=3)
+    result += row(own['gl_r9_total'], opp['gl_r9_total'], "R 9", width=3)
+    result += row(f"{own['avg_gl']:.1f}", f"{opp['avg_gl']:.1f}", "平均", width=4)
     result += "\n"
 
-    # GLレリック分布
+    # GLレリック分布（2桁）
     result += "GLレリック分布\n"
     for base_id, name in GL_NAMES.items():
         od = own['gl_relic_dist'][base_id]
@@ -266,42 +266,42 @@ def format_comparison(own, opp):
 
         if o_total > 0 or p_total > 0:
             result += f"  {name}\n"
-            result += row(o_total, p_total, "所持数")
-            result += row(od['r10'], op['r10'], "R10")
-            result += row(od['r9'], op['r9'], "R 9")
+            result += row(o_total, p_total, "所持数", width=2)
+            result += row(od['r10'], op['r10'], "R10", width=2)
+            result += row(od['r9'], op['r9'], "R 9", width=2)
     result += "\n"
 
-    # 主要艦船
+    # 主要艦船（2桁）
     result += "主要艦船\n"
-    result += row(own['levi_count'], opp['levi_count'], "Leviathan")
-    result += row(own['prof_count'], opp['prof_count'], "Profundity")
-    result += row(own['exec_count'], opp['exec_count'], "Executor")
+    result += row(own['levi_count'], opp['levi_count'], "Leviathan", width=2)
+    result += row(own['prof_count'], opp['prof_count'], "Profundity", width=2)
+    result += row(own['exec_count'], opp['exec_count'], "Executor", width=2)
     result += "\n"
 
-    # 平均値
+    # 平均値（3桁）
     result += "平均値\n"
-    result += row(own['avg_arena'], opp['avg_arena'], "アリーナランク")
-    result += row(own['avg_ship'], opp['avg_ship'], "シップランク")
+    result += row(own['avg_arena'], opp['avg_arena'], "アリーナランク", width=3)
+    result += row(own['avg_ship'], opp['avg_ship'], "シップランク", width=3)
     result += "\n"
 
-    # データクロン
+    # データクロン（3桁）
     result += "データクロン\n"
-    result += row(own['fdc_lv15'], opp['fdc_lv15'], "FDC Lv15")
-    result += row(own['fdc_lv12'], opp['fdc_lv12'], "FDC Lv12")
-    result += row(own['dc_lv9'], opp['dc_lv9'], "DC Lv9")
+    result += row(own['fdc_lv15'], opp['fdc_lv15'], "FDC Lv15", width=3)
+    result += row(own['fdc_lv12'], opp['fdc_lv12'], "FDC Lv12", width=3)
+    result += row(own['dc_lv9'], opp['dc_lv9'], "DC Lv9", width=3)
     result += "\n"
 
-    # 個人ランク
+    # 個人ランク（2桁）
     result += "個人ランク\n"
-    result += row(own['leagues']['Kyber'], opp['leagues']['Kyber'], "カイバー")
-    result += row(own['leagues']['Aurodium'], opp['leagues']['Aurodium'], "オーロジウム")
-    result += row(own['leagues']['Chromium'], opp['leagues']['Chromium'], "クロミウム")
+    result += row(own['leagues']['Kyber'], opp['leagues']['Kyber'], "カイバー", width=2)
+    result += row(own['leagues']['Aurodium'], opp['leagues']['Aurodium'], "オーロジウム", width=2)
+    result += row(own['leagues']['Chromium'], opp['leagues']['Chromium'], "クロミウム", width=2)
     result += "\n"
 
-    # GP分布
+    # GP分布（2桁）
     result += "GP分布\n"
-    result += row(own['gp_10m_plus'], opp['gp_10m_plus'], "1000万超")
-    result += row(own['gp_8m_to_10m'], opp['gp_8m_to_10m'], "800-1000万")
+    result += row(own['gp_10m_plus'], opp['gp_10m_plus'], "1000万超", width=2)
+    result += row(own['gp_8m_to_10m'], opp['gp_8m_to_10m'], "800-1000万", width=2)
     result += "\n"
 
     result += "━━━━━━━━━━━━━━━━━━━━\n"
