@@ -272,8 +272,6 @@ def format_comparison(own, opp):
             result += f"  所持数: {o_total} vs {p_total}\n"
             result += f"  R10: {od['r10']:3} vs {op['r10']:3}\n"
             result += f"  R 9: {od['r9']:3} vs {op['r9']:3}\n"
-            result += f"  R 8: {od['r8']:3} vs {op['r8']:3}\n"
-            result += f"  以下: {od['below']:3} vs {op['below']:3}\n\n"
 
     result += "━━━━━━━━━━━━━━━━━━━━\n"
     result += f"データ取得: {own['success_count']}/{own['member_count']}人 vs {opp['success_count']}/{opp['member_count']}人\n"
