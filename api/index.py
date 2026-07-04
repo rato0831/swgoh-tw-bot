@@ -21,7 +21,7 @@ GL_DISPLAY_NAMES = {
     "JEDIMASTERKENOBI": "ジェダイ・マスター・ケノービ",
     "GRANDMASTERLUKE": "ジェダイ・マスター・ルーク・スカイウォーカー",
     "SITHPALPATINE": "シス・エターナルの皇帝",
-    "SUPREMELEADERKYLOREN": "カイロ・レン 最高指導者",
+    "SUPREMELEADERKYLOREN": "カイロ・レン最高指導者",
     "GLREY": "レイ",
 }
 
@@ -251,7 +251,7 @@ def format_comparison(own, opp):
     result += "\n"
 
     # GL（全行width=4）
-    result += "GL（Galactic Legend）\n"
+    result += "GL（銀河の伝説）\n"
     result += row(own['gl_total'], opp['gl_total'], "合計", width=4)
     result += row(own['gl_r10_total'], opp['gl_r10_total'], "R10", width=4)
     result += row(own['gl_r9_total'], opp['gl_r9_total'], "R 9", width=4)
@@ -279,9 +279,9 @@ def format_comparison(own, opp):
 
     # 主要艦船（2桁）
     result += "主要艦船\n"
-    result += row(own['levi_count'], opp['levi_count'], "Leviathan", width=2)
-    result += row(own['prof_count'], opp['prof_count'], "Profundity", width=2)
-    result += row(own['exec_count'], opp['exec_count'], "Executor", width=2)
+    result += row(own['levi_count'], opp['levi_count'], "レヴァイアサン", width=2)
+    result += row(own['prof_count'], opp['prof_count'], "プロファンディティ", width=2)
+    result += row(own['exec_count'], opp['exec_count'], "エグゼクター", width=2)
     result += "\n"
 
     # 平均値（3桁）
