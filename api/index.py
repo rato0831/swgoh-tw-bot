@@ -13,16 +13,16 @@ SWGOH_API_KEY = os.environ.get("SWGOH_API_KEY")
 
 # GL base_id → 表示名マッピング
 GL_NAMES = {
-    "GLREY": "Rey",
-    "SUPREMELEADERKYLOREN": "最高指導者",
-    "LORDVADER": "LV",
-    "GRANDMASTERLUKE": "JML",
-    "SITHPALPATINE": "SEE",
-    "GLLEIA": "Leia",
-    "JABBATHEHUTT": "Jabba",
-    "GLAHSOKATANO": "Ahsoka",
     "GLHONDO": "Hondo",
+    "GLAHSOKATANO": "Ahsoka",
+    "JABBATHEHUTT": "Jabba",
+    "GLLEIA": "Leia",
     "JEDIMASTERKENOBI": "JMK",
+    "LORDVADER": "LV",
+    "SITHPALPATINE": "SEE",
+    "GRANDMASTERLUKE": "JML",
+    "SUPREMELEADERKYLOREN": "SLKR",
+    "GLREY": "Rey",
 }
 
 # ===== Discord署名検証 =====
@@ -271,7 +271,7 @@ def format_comparison(own, opp):
             result += f"{name}\n"
             result += f"  所持数: {o_total} vs {p_total}\n"
             result += f"  R10: {od['r10']:3} vs {op['r10']:3}\n"
-            result += f"  R 9: {od['r9']:3} vs {op['r9']:3}\n"
+            result += f"  R 9: {od['r9']:3} vs {op['r9']:3}\n\n"
 
     result += "━━━━━━━━━━━━━━━━━━━━\n"
     result += f"データ取得: {own['success_count']}/{own['member_count']}人 vs {opp['success_count']}/{opp['member_count']}人\n"
