@@ -241,18 +241,18 @@ def format_comparison(own, opp):
     result = f"【TW戦力比較】{own['name']} vs {opp['name']}\n\n"
     result += "━━━━━━━━━━━━━━━━━━━━\n"
 
-    # 総合戦力（GP=4, メンバー=2, 平均GP=4）
+    # 総合戦力（全行width=4）
     result += "総合戦力\n"
     result += row(format_gp(own['total_gp']), format_gp(opp['total_gp']), "GP", width=4)
-    result += row(own['member_count'], opp['member_count'], "メンバー数", width=2)
+    result += row(own['member_count'], opp['member_count'], "メンバー数", width=4)
     result += row(format_gp(own['avg_gp']), format_gp(opp['avg_gp']), "平均GP", width=4)
     result += "\n"
 
-    # GL（3桁、平均のみ特別）
+    # GL（全行width=4）
     result += "GL（Galactic Legend）\n"
-    result += row(own['gl_total'], opp['gl_total'], "合計", width=3)
-    result += row(own['gl_r10_total'], opp['gl_r10_total'], "R10", width=3)
-    result += row(own['gl_r9_total'], opp['gl_r9_total'], "R 9", width=3)
+    result += row(own['gl_total'], opp['gl_total'], "合計", width=4)
+    result += row(own['gl_r10_total'], opp['gl_r10_total'], "R10", width=4)
+    result += row(own['gl_r9_total'], opp['gl_r9_total'], "R 9", width=4)
     result += row(f"{own['avg_gl']:.1f}", f"{opp['avg_gl']:.1f}", "平均", width=4)
     result += "\n"
 
