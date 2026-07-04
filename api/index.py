@@ -249,8 +249,8 @@ def format_comparison(own, opp):
         if o_total > 0 or p_total > 0:
             result += f"  {name}\n"
             result += f"    所持数: {o_total} vs {p_total}\n"
-            result += f"    R10: {od['r10']} vs {op['r10']}\n"
-            result += f"    R 9: {od['r9']} vs {op['r9']}\n\n"
+            result += f"    R10: {od['r10']:3} vs {op['r10']}\n"
+            result += f"    R 9: {od['r9']:3} vs {op['r9']}\n\n"
     result += "\n"
 
     # 主要艦船
