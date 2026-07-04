@@ -11,7 +11,7 @@ app = FastAPI()
 DISCORD_PUBLIC_KEY = os.environ.get("DISCORD_PUBLIC_KEY")
 SWGOH_API_KEY = os.environ.get("SWGOH_API_KEY")
 
-# GL base_id → 表示名マッピング
+# GL base_id → 表示名（リリース新しい順）
 GL_NAMES = {
     "GLHONDO": "Hondo",
     "GLAHSOKATANO": "Ahsoka",
@@ -86,7 +86,7 @@ def process_member_data(member):
         "dc_lv9": 0,
         "arena": None,
         "ship": None,
-        "gl_relics": {}  # {base_id: r_level}
+        "gl_relics": {}
     }
 
     units = player_data.get("units", [])
@@ -97,7 +97,7 @@ def process_member_data(member):
         if unit_data.get("is_galactic_legend", False):
             result["gl"] += 1
             relic_tier = unit_data.get("relic_tier", 0)
-            result["gl_relics"][base_id] = relic_tier - 2  # R値に変換
+            result["gl_relics"][base_id] = relic_tier - 2
 
         if base_id == "CAPITALLEVIATHAN":
             result["levi"] = 1
@@ -156,9 +156,7 @@ def analyze_guild(guild_id):
     arena_ranks = []
     ship_ranks = []
     success_count = 0
-
-    # GL別レリック分布
-    gl_relic_dist = {base_id: {"r10": 0, "r9": 0, "r8": 0, "below": 0} for base_id in GL_NAMES}
+    gl_relic_dist = {base_id: {"r10": 0, "r9": 0} for base_id in GL_NAMES}
 
     with ThreadPoolExecutor(max_workers=20) as executor:
         futures = {executor.submit(process_member_data, m): m for m in members}
@@ -186,10 +184,6 @@ def analyze_guild(guild_id):
                             gl_relic_dist[base_id]["r10"] += 1
                         elif r_level == 9:
                             gl_relic_dist[base_id]["r9"] += 1
-                        elif r_level == 8:
-                            gl_relic_dist[base_id]["r8"] += 1
-                        else:
-                            gl_relic_dist[base_id]["below"] += 1
 
     avg_arena = sum(arena_ranks) // len(arena_ranks) if arena_ranks else 0
     avg_ship = sum(ship_ranks) // len(ship_ranks) if ship_ranks else 0
@@ -225,54 +219,59 @@ def format_comparison(own, opp):
     result = f"【TW戦力比較】{own['name']} vs {opp['name']}\n\n"
     result += "━━━━━━━━━━━━━━━━━━━━\n"
 
+    # 総合戦力
     result += "総合戦力\n"
     result += f"  GP: {format_gp(own['total_gp'])} vs {format_gp(opp['total_gp'])}\n"
     result += f"  メンバー数: {own['member_count']}人 vs {opp['member_count']}人\n"
     result += f"  平均GP: {format_gp(own['avg_gp'])} vs {format_gp(opp['avg_gp'])}\n\n"
 
+    # GL合計
     result += "GL（Galactic Legend）\n"
     result += f"  合計: {own['gl_total']}体 vs {opp['gl_total']}体\n"
     result += f"  平均: {own['avg_gl']:.1f}体 vs {opp['avg_gl']:.1f}体\n\n"
 
+    # GLレリック分布（GLセクションの直後）
+    result += "GLレリック分布\n"
+    for base_id, name in GL_NAMES.items():
+        od = own['gl_relic_dist'][base_id]
+        op = opp['gl_relic_dist'][base_id]
+        o_total = od['r10'] + od['r9']
+        p_total = op['r10'] + op['r9']
+
+        if o_total > 0 or p_total > 0:
+            result += f"  {name}\n"
+            result += f"    所持数: {o_total} vs {p_total}\n"
+            result += f"    R10: {od['r10']:3} vs {op['r10']:3}\n"
+            result += f"    R 9: {od['r9']:3} vs {op['r9']:3}\n"
+    result += "\n"
+
+    # 主要艦船
     result += "主要艦船\n"
     result += f"  Leviathan: {own['levi_count']}隻 vs {opp['levi_count']}隻\n"
     result += f"  Profundity: {own['prof_count']}隻 vs {opp['prof_count']}隻\n"
     result += f"  Executor: {own['exec_count']}隻 vs {opp['exec_count']}隻\n\n"
 
+    # 平均値
     result += "平均値\n"
     result += f"  平均アリーナランク: {own['avg_arena']}位 vs {opp['avg_arena']}位\n"
     result += f"  平均シップランク: {own['avg_ship']}位 vs {opp['avg_ship']}位\n\n"
 
+    # データクロン
     result += "データクロン\n"
     result += f"  FDC Lv15: {own['fdc_lv15']}個 vs {opp['fdc_lv15']}個\n"
     result += f"  FDC Lv12: {own['fdc_lv12']}個 vs {opp['fdc_lv12']}個\n"
     result += f"  DC Lv9: {own['dc_lv9']}個 vs {opp['dc_lv9']}個\n\n"
 
+    # 個人ランク
     result += "個人ランク\n"
     result += f"  カイバー: {own['leagues']['Kyber']}人 vs {opp['leagues']['Kyber']}人\n"
     result += f"  オーロジウム: {own['leagues']['Aurodium']}人 vs {opp['leagues']['Aurodium']}人\n"
     result += f"  クロミウム: {own['leagues']['Chromium']}人 vs {opp['leagues']['Chromium']}人\n\n"
 
+    # GP分布
     result += "GP分布\n"
     result += f"  1000万超: {own['gp_10m_plus']}人 vs {opp['gp_10m_plus']}人\n"
-    result += f"  800-1000万: {own['gp_8m_to_10m']}人 vs {opp['gp_8m_to_10m']}人\n\n"
-
-    # GLレリック分布
-    result += "━━━━━━━━━━━━━━━━━━━━\n"
-    result += "GLレリック分布\n\n"
-    for base_id, name in GL_NAMES.items():
-        od = own['gl_relic_dist'][base_id]
-        op = opp['gl_relic_dist'][base_id]
-        o_total = od['r10'] + od['r9'] + od['r8'] + od['below']
-        p_total = op['r10'] + op['r9'] + op['r8'] + op['below']
-
-        # どちらかに1人でもいる場合のみ表示
-        if o_total > 0 or p_total > 0:
-            result += f"{name}\n"
-            result += f"  所持数: {o_total} vs {p_total}\n"
-            result += f"  R10: {od['r10']:3} vs {op['r10']:3}\n"
-            result += f"  R 9: {od['r9']:3} vs {op['r9']:3}\n\n"
-
+    result += f"  800-1000万: {own['gp_8m_to_10m']}人 vs {opp['gp_8m_to_10m']}人\n"
     result += "━━━━━━━━━━━━━━━━━━━━\n"
     result += f"データ取得: {own['success_count']}/{own['member_count']}人 vs {opp['success_count']}/{opp['member_count']}人\n"
 
