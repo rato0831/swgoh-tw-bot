@@ -234,7 +234,7 @@ def format_gp(gp):
 def row(own_val, opp_val, label, width=3):
     """数値 vs 数値 : ラベル の形式で1行生成"""
     own_str = str(own_val).rjust(width)
-    opp_str = str(opp_val).ljust(width)
+    opp_str = str(opp_val).rjust(width)
     return f"  {own_str} vs {opp_str}: {label}\n"
 
 def format_comparison(own, opp):
@@ -268,7 +268,7 @@ def format_comparison(own, opp):
             result += f"  {name}\n"
             result += row(o_total, p_total, "所持数", width=2)
             result += row(od['r10'], op['r10'], "R10", width=2)
-            result += row(od['r9'], op['r9'], "R 9", width=2)
+            result += row(od['r9'], op['r9'], "R 9\n", width=2)
     result += "\n"
 
     # 主要艦船（2桁）
