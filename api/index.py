@@ -147,6 +147,8 @@ def analyze_guild(guild_id):
     gp_8m_to_10m = sum(1 for m in members if 8_000_000 <= m.get("galactic_power", 0) < 10_000_000)
 
     gl_total = 0
+    gl_r10_total = 0
+    gl_r9_total = 0
     levi_count = 0
     prof_count = 0
     exec_count = 0
@@ -182,8 +184,10 @@ def analyze_guild(guild_id):
                     if base_id in gl_relic_dist:
                         if r_level >= 10:
                             gl_relic_dist[base_id]["r10"] += 1
+                            gl_r10_total += 1
                         elif r_level == 9:
                             gl_relic_dist[base_id]["r9"] += 1
+                            gl_r9_total += 1
 
     avg_arena = sum(arena_ranks) // len(arena_ranks) if arena_ranks else 0
     avg_ship = sum(ship_ranks) // len(ship_ranks) if ship_ranks else 0
@@ -198,6 +202,8 @@ def analyze_guild(guild_id):
         "gp_10m_plus": gp_10m_plus,
         "gp_8m_to_10m": gp_8m_to_10m,
         "gl_total": gl_total,
+        "gl_r10_total": gl_r10_total,
+        "gl_r9_total": gl_r9_total,
         "avg_gl": avg_gl,
         "levi_count": levi_count,
         "prof_count": prof_count,
@@ -228,9 +234,11 @@ def format_comparison(own, opp):
     # GL合計
     result += "GL（Galactic Legend）\n"
     result += f"  合計: {own['gl_total']}体 vs {opp['gl_total']}体\n"
+    result += f"  R10: {own['gl_r10_total']}体 vs {opp['gl_r10_total']}体\n"
+    result += f"  R 9: {own['gl_r9_total']}体 vs {opp['gl_r9_total']}体\n"
     result += f"  平均: {own['avg_gl']:.1f}体 vs {opp['avg_gl']:.1f}体\n\n"
 
-    # GLレリック分布（GLセクションの直後）
+    # GLレリック分布
     result += "GLレリック分布\n"
     for base_id, name in GL_NAMES.items():
         od = own['gl_relic_dist'][base_id]
@@ -241,8 +249,8 @@ def format_comparison(own, opp):
         if o_total > 0 or p_total > 0:
             result += f"  {name}\n"
             result += f"    所持数: {o_total} vs {p_total}\n"
-            result += f"    R10: {od['r10']:3} vs {op['r10']:3}\n"
-            result += f"    R 9: {od['r9']:3} vs {op['r9']:3}\n"
+            result += f"    R10: {od['r10']} vs {op['r10']}\n"
+            result += f"    R 9: {od['r9']} vs {op['r9']}\n\n"
     result += "\n"
 
     # 主要艦船
