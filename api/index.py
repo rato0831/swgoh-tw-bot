@@ -13,16 +13,16 @@ SWGOH_API_KEY = os.environ.get("SWGOH_API_KEY")
 
 # 既知のGL表示名（新GL追加時だけここを更新、未登録はbase_idで表示）
 GL_DISPLAY_NAMES = {
-    "GLHONDO": "Hondo",
-    "GLAHSOKATANO": "Ahsoka",
-    "JABBATHEHUTT": "Jabba",
-    "GLLEIA": "Leia",
-    "JEDIMASTERKENOBI": "JMK",
-    "LORDVADER": "LV",
-    "SITHPALPATINE": "SEE",
-    "GRANDMASTERLUKE": "JML",
-    "SUPREMELEADERKYLOREN": "SLKR",
-    "GLREY": "Rey",
+    "GLHONDO": "海賊王ホンドー・オナカー",
+    "GLAHSOKATANO": "アソーカ・タノ",
+    "GLLEIA": "レイア・オーガナ",
+    "JABBATHEHUTT": "ジャバ・ザ・ハット",
+    "LORDVADER": "ベイダー卿",
+    "JEDIMASTERKENOBI": "ジェダイ・マスター・ケノービ",
+    "GRANDMASTERLUKE": "ジェダイ・マスター・ルーク・スカイウォーカー",
+    "SITHPALPATINE": "シス・エターナルの皇帝",
+    "SUPREMELEADERKYLOREN": "カイロ・レン 最高指導者",
+    "GLREY": "レイ",
 }
 
 # ===== Discord署名検証 =====
