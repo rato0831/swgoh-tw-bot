@@ -259,9 +259,11 @@ def format_comparison(own, opp):
     result += "\n"
 
     # GLレリック分布（動的、2桁）
-    all_gl_ids = sorted(
-        set(own['gl_relic_dist'].keys()) | set(opp['gl_relic_dist'].keys())
-    )
+    known_ids = [bid for bid in GL_DISPLAY_NAMES.keys() 
+                if bid in own['gl_relic_dist'] or bid in opp['gl_relic_dist']]
+    unknown_ids = sorted([bid for bid in set(own['gl_relic_dist'].keys()) | set(opp['gl_relic_dist'].keys())
+                          if bid not in GL_DISPLAY_NAMES])
+    all_gl_ids = known_ids + unknown_ids
     result += "GLレリック分布\n"
     for base_id in all_gl_ids:
         name = GL_DISPLAY_NAMES.get(base_id, base_id)
@@ -272,7 +274,7 @@ def format_comparison(own, opp):
             result += f"  {name}\n"
             result += row(od["total"], op["total"], "所持数", width=2)
             result += row(od["r10"], op["r10"], "R10", width=2)
-            result += row(od["r9"], op["r9"], "R 9", width=2)
+            result += row(od["r9"], op["r9"], "R 9\n", width=2)
     result += "\n"
 
     # 主要艦船（2桁）
