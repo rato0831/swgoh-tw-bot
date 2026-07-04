@@ -221,22 +221,30 @@ def analyze_guild(guild_id):
 def format_gp(gp):
     return f"{gp // 1_000_000}M"
 
+def row(own_val, opp_val, label, width=4):
+    """数値 vs 数値 : ラベル の形式で1行生成"""
+    own_str = str(own_val).rjust(width)
+    opp_str = str(opp_val).ljust(width)
+    return f"  {own_str} vs {opp_str}: {label}\n"
+
 def format_comparison(own, opp):
     result = f"【TW戦力比較】{own['name']} vs {opp['name']}\n\n"
     result += "━━━━━━━━━━━━━━━━━━━━\n"
 
     # 総合戦力
     result += "総合戦力\n"
-    result += f"  GP: {format_gp(own['total_gp'])} vs {format_gp(opp['total_gp'])}\n"
-    result += f"  メンバー数: {own['member_count']}人 vs {opp['member_count']}人\n"
-    result += f"  平均GP: {format_gp(own['avg_gp'])} vs {format_gp(opp['avg_gp'])}\n\n"
+    result += row(format_gp(own['total_gp']), format_gp(opp['total_gp']), "GP")
+    result += row(own['member_count'], opp['member_count'], "メンバー数")
+    result += row(format_gp(own['avg_gp']), format_gp(opp['avg_gp']), "平均GP")
+    result += "\n"
 
-    # GL合計
+    # GL
     result += "GL（Galactic Legend）\n"
-    result += f"  合計: {own['gl_total']}体 vs {opp['gl_total']}体\n"
-    result += f"  R10: {own['gl_r10_total']}体 vs {opp['gl_r10_total']}体\n"
-    result += f"  R 9: {own['gl_r9_total']}体 vs {opp['gl_r9_total']}体\n"
-    result += f"  平均: {own['avg_gl']:.1f}体 vs {opp['avg_gl']:.1f}体\n\n"
+    result += row(own['gl_total'], opp['gl_total'], "合計")
+    result += row(own['gl_r10_total'], opp['gl_r10_total'], "R10")
+    result += row(own['gl_r9_total'], opp['gl_r9_total'], "R 9")
+    result += row(f"{own['avg_gl']:.1f}", f"{opp['avg_gl']:.1f}", "平均")
+    result += "\n"
 
     # GLレリック分布
     result += "GLレリック分布\n"
@@ -248,38 +256,44 @@ def format_comparison(own, opp):
 
         if o_total > 0 or p_total > 0:
             result += f"  {name}\n"
-            result += f"    所持数: {o_total} vs {p_total}\n"
-            result += f"    R10: {od['r10']:3} vs {op['r10']}\n"
-            result += f"    R 9: {od['r9']:3} vs {op['r9']}\n\n"
+            result += row(o_total, p_total, "所持数")
+            result += row(od['r10'], op['r10'], "R10")
+            result += row(od['r9'], op['r9'], "R 9")
     result += "\n"
 
     # 主要艦船
     result += "主要艦船\n"
-    result += f"  Leviathan: {own['levi_count']}隻 vs {opp['levi_count']}隻\n"
-    result += f"  Profundity: {own['prof_count']}隻 vs {opp['prof_count']}隻\n"
-    result += f"  Executor: {own['exec_count']}隻 vs {opp['exec_count']}隻\n\n"
+    result += row(own['levi_count'], opp['levi_count'], "Leviathan")
+    result += row(own['prof_count'], opp['prof_count'], "Profundity")
+    result += row(own['exec_count'], opp['exec_count'], "Executor")
+    result += "\n"
 
     # 平均値
     result += "平均値\n"
-    result += f"  平均アリーナランク: {own['avg_arena']}位 vs {opp['avg_arena']}位\n"
-    result += f"  平均シップランク: {own['avg_ship']}位 vs {opp['avg_ship']}位\n\n"
+    result += row(own['avg_arena'], opp['avg_arena'], "アリーナランク")
+    result += row(own['avg_ship'], opp['avg_ship'], "シップランク")
+    result += "\n"
 
     # データクロン
     result += "データクロン\n"
-    result += f"  FDC Lv15: {own['fdc_lv15']}個 vs {opp['fdc_lv15']}個\n"
-    result += f"  FDC Lv12: {own['fdc_lv12']}個 vs {opp['fdc_lv12']}個\n"
-    result += f"  DC Lv9: {own['dc_lv9']}個 vs {opp['dc_lv9']}個\n\n"
+    result += row(own['fdc_lv15'], opp['fdc_lv15'], "FDC Lv15")
+    result += row(own['fdc_lv12'], opp['fdc_lv12'], "FDC Lv12")
+    result += row(own['dc_lv9'], opp['dc_lv9'], "DC Lv9")
+    result += "\n"
 
     # 個人ランク
     result += "個人ランク\n"
-    result += f"  カイバー: {own['leagues']['Kyber']}人 vs {opp['leagues']['Kyber']}人\n"
-    result += f"  オーロジウム: {own['leagues']['Aurodium']}人 vs {opp['leagues']['Aurodium']}人\n"
-    result += f"  クロミウム: {own['leagues']['Chromium']}人 vs {opp['leagues']['Chromium']}人\n\n"
+    result += row(own['leagues']['Kyber'], opp['leagues']['Kyber'], "カイバー")
+    result += row(own['leagues']['Aurodium'], opp['leagues']['Aurodium'], "オーロジウム")
+    result += row(own['leagues']['Chromium'], opp['leagues']['Chromium'], "クロミウム")
+    result += "\n"
 
     # GP分布
     result += "GP分布\n"
-    result += f"  1000万超: {own['gp_10m_plus']}人 vs {opp['gp_10m_plus']}人\n"
-    result += f"  800-1000万: {own['gp_8m_to_10m']}人 vs {opp['gp_8m_to_10m']}人\n"
+    result += row(own['gp_10m_plus'], opp['gp_10m_plus'], "1000万超")
+    result += row(own['gp_8m_to_10m'], opp['gp_8m_to_10m'], "800-1000万")
+    result += "\n"
+
     result += "━━━━━━━━━━━━━━━━━━━━\n"
     result += f"データ取得: {own['success_count']}/{own['member_count']}人 vs {opp['success_count']}/{opp['member_count']}人\n"
 
